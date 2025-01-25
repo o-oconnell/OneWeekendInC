@@ -66,9 +66,9 @@ void write_color(vec3* pixel_color) {
     double b = z(pixel_color);
 
     // Translate the [0,1] component values to the byte range [0,255].
-    int rbyte = int(255.999 * r);
-    int gbyte = int(255.999 * g);
-    int bbyte = int(255.999 * b);
+    int rbyte = (int)(255.999 * r);
+    int gbyte = (int)(255.999 * g);
+    int bbyte = (int)(255.999 * b);
 
     // Write out the pixel color components.
     printf("%d %d %d\n", rbyte, gbyte, bbyte);
@@ -87,8 +87,8 @@ int main() {
 
     for (int j = 0; j < image_height; j++) {
         for (int i = 0; i < image_width; i++) {
-            double r = double(i) / (image_width-1);
-            double g = double(j) / (image_height-1);
+            double r = (double)(i) / (image_width-1);
+            double g = (double)(j) / (image_height-1);
             double b = 0.0;
 
             vec3 *pixel_color = newVec3(arena, r, g, b);
