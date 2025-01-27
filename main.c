@@ -93,12 +93,6 @@ double length(Arena *arena, vec3 *v) {
     return sqrt(length_squared(arena, v));
 }
 
-
-vec3 at(Arena *arena, ray *r, double t) {
-
-    // return r->origin + t * r->direction;
-}
-
 vec3 *mul(Arena *arena, double t, vec3 *vec) {
     vec3 *result = (vec3*) pushArray(arena, sizeof(vec3));
 
@@ -125,6 +119,7 @@ vec3 *unit_vector(Arena *arena, vec3 *v) {
     return vec_div(arena, v, length(arena, v));
 }
 
+
 vec3 *plus(Arena *arena, vec3 *a, vec3 *b) {
     
     vec3 *result = (vec3*) pushArray(arena, sizeof(vec3));
@@ -134,6 +129,13 @@ vec3 *plus(Arena *arena, vec3 *a, vec3 *b) {
     result->e[2] = a->e[2] + b->e[2];
 
     return result;
+}
+
+vec3 *at(Arena *arena, ray *r, double t) {
+
+    // does this assume r->direction is a unit vector ? I think sos
+    return plus(arena, &r->origin, mul(arena, t, &r->direction));
+    // return r->origin + t * r->direction;
 }
 
 // vec3 *plus_vararg(Arena *arena, vec3 *a, ...) {
@@ -253,7 +255,7 @@ double dot(vec3 *u, vec3 *v) {
 // b = 2d dot (C - Q) 
 // c = (C - Q) dot (C - Q) - r^2
 
-int hit_sphere(Arena *arena, vec3 *center, double radius, ray *r) {
+double hit_sphere(Arena *arena, vec3 *center, double radius, ray *r) {
     vec3 *oc = minus_vararg(arena, center, &r->origin, NULL);
 
     double a = dot(&r->direction, &r->direction); // length?
@@ -261,16 +263,32 @@ int hit_sphere(Arena *arena, vec3 *center, double radius, ray *r) {
     double c = dot(oc, oc) - radius * radius;
 
     double discriminant = b * b - 4 * a * c;
-    return discriminant >= 0;
+
+    if (discriminant < 0) {
+        return -1.0;
+    } else {
+        return (-b - sqrt(discriminant)) / (2.0*a);
+    }
+    // return discriminant >= 0;
 }
 
 
 vec3 *ray_color(Arena *arena, ray* r) {
+    double t = hit_sphere(arena, newVec3(arena, 0,0, -1), 0.5, r);
+    if (t > 0.0) {
 
-    // sphere in the center of the viewport (-1 away from camera)
-    if (hit_sphere(arena, newVec3(arena, 0, 0, -1), 0.5, r)) {
-        return newVec3(arena, 1, 0, 0);
+        // This is the normal because it goes from the center of the sphere (0, 0, -1) to the intersection point.
+        vec3 *N = unit_vector(arena, minus_vararg(arena, at(arena, r, t), newVec3(arena, 0, 0, -1), NULL));
+
+        // again we add 1 and multiply by 0.5 so the value is in [0, 1] I think
+        return mul(arena, 0.5, newVec3(arena, x(N) + 1, y(N) + 1, z(N) + 1));
     }
+
+
+    // // sphere in the center of the viewport (-1 away from camera)
+    // if (hit_sphere(arena, newVec3(arena, 0, 0, -1), 0.5, r)) {
+    //     return newVec3(arena, 1, 0, 0);
+    // }
     
     // fprintf(stderr, "Ray direction is %s\n", vec2str(arena, &r->direction));
 
