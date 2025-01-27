@@ -1,4 +1,5 @@
 #include <netinet/in.h> 
+#include <math.h>
 #include <stdio.h> 
 #include <stdlib.h> 
 #include <string.h>
@@ -6,6 +7,7 @@
 #include <sys/types.h> 
 #include <asm-generic/mman.h>
 #include <sys/mman.h>
+#include <stdarg.h>
 
 typedef struct vec3 vec3;
 struct vec3 {
@@ -24,6 +26,7 @@ struct ray {
     vec3 direction;
 };
 
+char *vec2str(Arena *arena, vec3 *vec);
 
 Arena *arenaAlloc(size_t size) {
     void *block = mmap(NULL, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
@@ -44,6 +47,52 @@ void* pushArray(Arena *arena, size_t size) {
 
     return result;
 }
+
+void vecCopy(Arena * arena, vec3* dest, vec3 *src) {
+    // fprintf(stderr, "DEST IS %d SRC IS %d\n", dest, src);
+    // fprintf(stderr, "DEST IS %s, SRC IS %s\n", vec2str(arena, dest), vec2str(arena, src));
+
+    dest->e[0] = src->e[0];
+    dest->e[1] = src->e[1];
+    dest->e[2] = src->e[2];
+
+    // fprintf(stderr, "DEST IS %s, SRC IS %s\n", vec2str(arena, dest), vec2str(arena, src));
+
+}
+
+ray* newRay(Arena *arena, vec3 *origin, vec3 *direction) {
+    ray *result = (ray*) pushArray(arena, sizeof(ray));
+
+    vecCopy(arena, &result->origin, origin);
+    vecCopy(arena, &result->direction, direction);
+
+    // fprintf(stderr, "ORIGIN IS %s, DIRECTION IS %s\n", vec2str(arena, origin), vec2str(arena, direction));
+    // fprintf(stderr, "NEW RAY ORIGIN IS %s, DIRECTION IS %s\n", vec2str(arena, &result->origin), vec2str(arena, &result->direction));
+
+    return result;
+}
+
+vec3 *newVec3(Arena  *arena, double r, double g, double b) {
+    vec3 *newVec = (vec3*) pushArray(arena, sizeof(vec3));
+    newVec->e[0] = r;
+    newVec->e[1] = g;
+    newVec->e[2] = b;
+
+    return newVec;
+}
+
+
+double length_squared(Arena *arena, vec3 *v) {
+    double result = v->e[0]*v->e[0] + v->e[1]*v->e[1] + v->e[2]*v->e[2];
+    // fprintf(stderr, "Length squared result is %lf\n", result);
+
+    return result;  
+}
+
+double length(Arena *arena, vec3 *v) {
+    return sqrt(length_squared(arena, v));
+}
+
 
 vec3 at(Arena *arena, ray *r, double t) {
 
@@ -70,6 +119,11 @@ vec3 *vec_div(Arena *arena, vec3 *vec, double t) {
     return result;
 }
 
+vec3 *unit_vector(Arena *arena, vec3 *v) {
+    // vec3 *newVec = (vec3*) pushArray(arena, sizeof(vec3));
+
+    return vec_div(arena, v, length(arena, v));
+}
 
 vec3 *plus(Arena *arena, vec3 *a, vec3 *b) {
     
@@ -82,14 +136,64 @@ vec3 *plus(Arena *arena, vec3 *a, vec3 *b) {
     return result;
 }
 
+// vec3 *plus_vararg(Arena *arena, vec3 *a, ...) {
+//     va_list args;
+//     va_start(args, a);
 
-vec3 *newVec3(Arena *arena, double r, double g, double b) {
-    vec3 *newVec = (vec3*) pushArray(arena, sizeof(vec3));
-    newVec->e[0] = r;
-    newVec->e[1] = g;
-    newVec->e[2] = b;
+//     vec3 *result = (vec3*) pushArray(arena, sizeof(vec3));
 
-    return newVec;
+
+//     int result = 0;
+//     for (int i = 0; i < count; i++) {
+//         result += va_arg(args, int);
+//     }
+
+//     va_end(args);
+//     return result;
+// }
+
+vec3 *plus_vararg(Arena *arena, vec3 *first, ...) {
+    vec3 *result = (vec3*) pushArray(arena, sizeof(vec3));
+
+    va_list args;
+    va_start(args, first);
+
+    vec3 *vec = first;
+    while (vec != NULL) {
+        // printf("%s ", vec);
+        result->e[0] += vec->e[0];
+        result->e[1] += vec->e[1];
+        result->e[2] += vec->e[2];
+
+        vec = va_arg(args, vec3*);
+    }
+
+    va_end(args);
+    // printf("\n");
+    return result;
+}
+
+
+
+vec3 *minus_vararg(Arena *arena, vec3 *first, ...) {
+    vec3 *result = (vec3*) pushArray(arena, sizeof(vec3));
+
+    va_list args;
+    va_start(args, first);
+
+    vec3 *vec = first;
+    while (vec != NULL) {
+        // printf("%s ", vec);
+        result->e[0] -= vec->e[0];
+        result->e[1] -= vec->e[1];
+        result->e[2] -= vec->e[2];
+
+        vec = va_arg(args, vec3*);
+    }
+
+    va_end(args);
+    // printf("\n");
+    return result;
 }
 
 vec3 *minus(Arena * arena, vec3 *a, vec3 *b) {
@@ -124,11 +228,68 @@ void write_color(vec3* pixel_color) {
 }
 
 
+
 char *vec2str(Arena *arena, vec3 *vec) {
     char *result = pushArray(arena, 100*sizeof(char));
     sprintf(result, "%lf %lf %lf", vec->e[0], vec->e[1], vec->e[2]);
 
     return result;
+}
+
+
+double dot(vec3 *u, vec3 *v) {
+
+    return u->e[0] * v->e[0] 
+            + u->e[1] * v->e[1]
+            + u->e[2] * v->e[2];
+}
+
+
+// Book simplifies this to: t^2d⋅d−2td⋅(C−Q)+(C−Q)⋅(C−Q)−r^2=0
+// where r is sphere radius, Q is ray origin, d is ray direction, and t is the distance along the ray.
+// solve for t.
+// it's in the form ax^2 + bc + c = 0
+// a = d dot d
+// b = 2d dot (C - Q) 
+// c = (C - Q) dot (C - Q) - r^2
+
+int hit_sphere(Arena *arena, vec3 *center, double radius, ray *r) {
+    vec3 *oc = minus_vararg(arena, center, &r->origin, NULL);
+
+    double a = dot(&r->direction, &r->direction); // length?
+    double b = -2.0 * dot(&r->direction, oc);
+    double c = dot(oc, oc) - radius * radius;
+
+    double discriminant = b * b - 4 * a * c;
+    return discriminant >= 0;
+}
+
+
+vec3 *ray_color(Arena *arena, ray* r) {
+
+    // sphere in the center of the viewport (-1 away from camera)
+    if (hit_sphere(arena, newVec3(arena, 0, 0, -1), 0.5, r)) {
+        return newVec3(arena, 1, 0, 0);
+    }
+    
+    // fprintf(stderr, "Ray direction is %s\n", vec2str(arena, &r->direction));
+
+    // this only works because the camera is like 1 unit away from the viewport I think
+    // No, not true. It works because we scale it UP to 1.
+    vec3 *unit_direction = unit_vector(arena, &r->direction);
+
+    // fprintf(stderr, "unit vector is %s\n", vec2str(arena, unit_direction));
+// 
+    // Scales the y value from 0 to 1. Reasoning: y component can get as low as -1.0 and as high as 1.0
+    // since it's a unit vector. When y components is -1.0, we get 0. When y component is 1.0, we get 1.0;
+    double a = 0.5*(y(unit_direction) + 1.0);
+
+    // lerp:
+    // when a = 0.0, we get white (1.0, 1.0, 1.0). 
+    // when a = 1.1 we get blue (0.5, 0.7, 1.0)
+
+    return plus_vararg(arena, mul(arena, (1.0 - a), newVec3(arena, 1.0, 1.0, 1.0)), mul(arena,  a, newVec3(arena, 0.5, 0.7, 1.0)), NULL);
+    // return newVec3(arena, 0,0,0);
 }
 
 int main() {
@@ -161,8 +322,6 @@ int main() {
     
     fprintf(stderr, "Pixel delta u is %lf\n", x(pixel_delta_u));
     fprintf(stderr, "Pixel delta v is %lf\n", y(pixel_delta_v));
-
-// need to do vector minus NEXT
 
     // camera_center - (0, 0, focal_length) - viewport_u/2 - viewport_v/2
 
@@ -203,16 +362,21 @@ int main() {
     // (in terms of PHYSICAL coordinates, this is correct). We have different coordinates for the actual pixels.
 
 
-    // Should be: negative in the x direction and z direction, positive in the y direction
-    vec3 *viewport_upper_left = minus(arena, 
-                minus(arena, 
-                    minus(arena, 
-                        camera_center, 
-                        newVec3(arena, 0, 0, focal_length)), 
-                    vec_div(arena, viewport_u, 2)), 
-                vec_div(arena, viewport_v, 2));
+    // // Should be: negative in the x direction and z direction, positive in the y direction
+    // vec3 *viewport_upper_left = minus(arena, 
+    //             minus(arena, 
+    //                 minus(arena, 
+    //                     camera_center, 
+    //                     newVec3(arena, 0, 0, focal_length)), 
+    //                 vec_div(arena, viewport_u, 2)), 
+    //             vec_div(arena, viewport_v, 2));
 
-    vec3 *pixel00_loc = plus(arena, viewport_upper_left, mul(arena, 0.5, plus(arena, pixel_delta_u, pixel_delta_v)));
+    vec3 *viewport_upper_left = minus_vararg(arena, camera_center, newVec3(arena, 0, 0, focal_length), vec_div(arena, viewport_u, 2), vec_div(arena, viewport_v, 2), NULL);
+
+    // vec3 *pixel00_loc = plus(arena, viewport_upper_left, mul(arena, 0.5, plus(arena, pixel_delta_u, pixel_delta_v)));
+
+    vec3 *pixel00_loc = plus_vararg(arena, viewport_upper_left, mul(arena, 0.5, plus(arena, pixel_delta_u, pixel_delta_v)), NULL);
+
 
     // fprintf(stderr, "Camera center is %s\n", vec2str(arena, camera_center));
     // fprintf(stderr, "Viewport v is %s\n", vec2str(arena, viewport_v));
@@ -242,11 +406,26 @@ int main() {
 
     for (int j = 0; j < image_height; j++) {
         for (int i = 0; i < image_width; i++) {
-            double r = (double)(i) / (image_width-1);
-            double g = (double)(j) / (image_height-1);
-            double b = 0.0;
+            // double r = (double)(i) / (image_width-1);
+            // double g = (double)(j) / (image_height-1);
+            // double b = 0.0;
 
-            vec3 *pixel_color = newVec3(arena, r, g, b);
+            // vec3 *pixel_color = newVec3(arena, r, g, b);
+
+            vec3 *pixel_center = plus_vararg(arena, pixel00_loc, mul(arena, i, pixel_delta_u), mul(arena, j, pixel_delta_v), NULL);
+            
+            // fprintf(stderr, "pixel center is %s\n", vec2str(arena, pixel_center));
+            
+            vec3 *ray_direction = minus_vararg(arena, pixel_center, camera_center, NULL);
+
+            // fprintf(stderr, "Ray direction HERE is %s\n", vec2str(arena, ray_direction));
+
+            ray *r = newRay(arena, camera_center, ray_direction);
+
+            // printf("After newRay, ray direction is %s\n", vec2str(arena, &r->direction));
+
+            vec3 *pixel_color = ray_color(arena, r);
+            // vec3 *pixel_center = plus()
 
             write_color(pixel_color);
         }
