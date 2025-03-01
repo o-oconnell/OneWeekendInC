@@ -179,6 +179,26 @@ vec3 *vec_div(Arena *arena, vec3 *vec, double t) {
     return result;
 }
 
+vec3 vec_div_noPointer(vec3 *vec, double t) {
+    vec3 result;
+
+    result.e[0] = vec->e[0] / t;
+    result.e[1] = vec->e[1] / t;
+    result.e[2] = vec->e[2] / t;
+
+    return result;
+}
+
+vec3 vec_div_noPointer_noPointerArgs(vec3 vec, double t) {
+    vec3 result;
+
+    result.e[0] = vec.e[0] / t;
+    result.e[1] = vec.e[1] / t;
+    result.e[2] = vec.e[2] / t;
+
+    return result;
+}
+
 vec3 *unit_vector(Arena *arena, vec3 *v) {
   return vec_div(arena, v, length(arena, v));
 }
@@ -317,25 +337,36 @@ vec3 *minus_vararg(Arena *arena, vec3 *first, ...) {
     return result;
 }
 
-vec3 minus_vararg_nopointer(Arena *arena, vec3 *first, ...) {
-    // vec3 *result = (vec3*) pushArray(arena, sizeof(vec3));
+vec3 minus_vararg_nopointer(int count, vec3 first, ...) {
     vec3 result;
+    result.e[0] = 0;
+    result.e[1] = 0;
+    result.e[2] = 0;
 
     va_list args;
     va_start(args, first);
 
-    vec3 *vec = first;
-    while (vec != NULL) {
-        result.e[0] -= vec->e[0];
-        result.e[1] -= vec->e[1];
-        result.e[2] -= vec->e[2];
+    vec3 vec = first;
 
-        vec = va_arg(args, vec3*);
+    for (int i = 0; i  < count; ++i) {
+        result.e[0] -= vec.e[0];
+        result.e[1] -= vec.e[1];
+        result.e[2] -= vec.e[2];
+
+        vec = va_arg(args, vec3);
     }
+    // while (vec != NULL) {
+    //     result.e[0] += vec->e[0];
+    //     result.e[1] += vec->e[1];
+    //     result.e[2] += vec->e[2];
+
+    //     vec = va_arg(args, vec3);
+    // }
 
     va_end(args);
     return result;
 }
+
 
 vec3 *minus(Arena * arena, vec3 *a, vec3 *b) {
     return newVec3(arena, a->e[0] - b->e[0], a->e[1] - b->e[1], a->e[2] - b->e[2]);
@@ -508,10 +539,10 @@ double hit_sphere(Arena *arena, vec3 *center, double radius, ray *r, double ray_
     vec3 *normal;
     if (dot(&r->direction, outward_normal) > 0.0) {
         // Ray is inside sphere
-        fprintf(stderr, "RAY INSIDE SPHERE\n");
+        // fprintf(stderr, "RAY INSIDE SPHERE\n");
         normal = mul(arena, -1.0, outward_normal);
     } else {
-        fprintf(stderr, "RAY OUTSIDE SPHERE\n");
+        // fprintf(stderr, "RAY OUTSIDE SPHERE\n");
         normal = outward_normal;
     }
 
@@ -902,11 +933,11 @@ int main() {
     // vec3 *viewport_u = newVec3(arena, viewport_width, 0, 0);
     // vec3 *viewport_v = newVec3(arena, 0, -viewport_height, 0);
     
-    vec3 *pixel_delta_u = vec_div(arena, viewport_u, image_width);
-    vec3 *pixel_delta_v = vec_div(arena, viewport_v, image_height);
+    vec3 pixel_delta_u = vec_div_noPointer(viewport_u, image_width);
+    vec3 pixel_delta_v = vec_div_noPointer(viewport_v, image_height);
     
-    fprintf(stderr, "Pixel delta u is %lf\n", x(pixel_delta_u));
-    fprintf(stderr, "Pixel delta v is %lf\n", y(pixel_delta_v));
+    fprintf(stderr, "Pixel delta u is %lf\n", x(&pixel_delta_u));
+    fprintf(stderr, "Pixel delta v is %lf\n", y(&pixel_delta_v));
 
 
     fprintf(stderr, "viewport_u/2 IS %s\n", vec2str(arena, minus(arena, camera_center, vec_div(arena, viewport_u, 2.0))));
@@ -915,14 +946,15 @@ int main() {
     // mul(arena, focal_length, w) - multiplies unit vector pointing in the Z direction by the actual length
     // viewport_u / 2 = half of the width
     // viewport_v / 2 = half of the height
-    vec3 *viewport_upper_left = minus_vararg(arena, camera_center, mul(arena, focal_length, w), vec_div(arena, viewport_u, 2), vec_div(arena, viewport_v, 2), NULL);
+
+    vec3 viewport_upper_left = minus_vararg_nopointer(4, *camera_center, mul_nopointer(focal_length, w), vec_div_noPointer(viewport_u, 2), vec_div_noPointer(viewport_v, 2));
 
     // vec3 *viewport_upper_left = minus_vararg(arena, camera_center, newVec3(arena, 0, 0, focal_length), vec_div(arena, viewport_u, 2), vec_div(arena, viewport_v, 2), NULL);
 
-    vec3 *arg2 = mul(arena, 0.5, plus(arena, pixel_delta_u, pixel_delta_v));
-    vec3 pixel00_loc = plus_nopointer(viewport_upper_left, arg2);
+    vec3 arg2 = mul_nopointer_noPointerArgs(0.5, plus_nopointer_noPointerArgs(pixel_delta_u, pixel_delta_v));
+    vec3 pixel00_loc = plus_nopointer_noPointerArgs(viewport_upper_left, arg2);
+    fprintf(stderr, "Viewport upper left is %s\n", vec2str(arena, &viewport_upper_left));
 
-    fprintf(stderr, "Viewport upper left is %s\n", vec2str(arena, viewport_upper_left));
     fprintf(stderr, "Pixel 0,0 location is %s\n", vec2str(arena, &pixel00_loc));
     printf("P3\n%d %d\n255\n", image_width, image_height);
 
@@ -934,8 +966,8 @@ int main() {
             vec3 pixel_color = newVec3_noArena(0, 0, 0);
 
             int arg_count = 3;
-            vec3 arg2 = mul_nopointer(i, pixel_delta_u); 
-            vec3 arg3 = mul_nopointer(j, pixel_delta_v);
+            vec3 arg2 = mul_nopointer_noPointerArgs(i, pixel_delta_u); 
+            vec3 arg3 = mul_nopointer_noPointerArgs(j, pixel_delta_v);
 
             vec3 pixel_center = plus_vararg_nopointer(arg_count, pixel00_loc, arg2, arg3);
 
