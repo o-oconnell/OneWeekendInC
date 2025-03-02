@@ -10,3 +10,7 @@ First version:
 Second version:
 
 ![imagepic2](https://github.com/o-oconnell/RayTracer/blob/main/sample2.png)
+
+Final scene from Ray Tracing in One Weekend:
+
+![imagepic3](https://github.com/o-oconnell/RayTracer/blob/main/finalscene.png)
