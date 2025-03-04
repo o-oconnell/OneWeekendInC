@@ -62,6 +62,11 @@ struct hittable {
     enum hittable_material material;
 };
 
+#define MAX_DIFFUSE_DEPTH 50
+#define HITTABLES_LENGTH 500
+
+hittable hittables[HITTABLES_LENGTH];
+
 char *vec2str(Arena *arena, vec3 *vec);
 
 Arena *arenaAlloc(size_t size) {
@@ -84,14 +89,7 @@ void* pushArray(Arena *arena, size_t size) {
     return result;
 }
 
-void vecCopy(Arena * arena, vec3* dest, vec3 *src) {
-    dest->e[0] = src->e[0];
-    dest->e[1] = src->e[1];
-    dest->e[2] = src->e[2];
-}
-
 ray newRay(vec3 origin, vec3 direction) {
-    // ray *result = (ray*) pushArray(arena, sizeof(ray));
     ray result;
     result.origin = origin;
     result.direction = direction;
@@ -109,13 +107,9 @@ vec3 newVec3(double r, double g, double b) {
     return newVec;
 }
 
-
 double length_squared(vec3 v) {
-    double result = v.e[0]*v.e[0] + v.e[1]*v.e[1] + v.e[2]*v.e[2];
-
-    return result;  
+    return v.e[0]*v.e[0] + v.e[1]*v.e[1] + v.e[2]*v.e[2];
 }
-
 
 double length(vec3 v) {
     return sqrt(length_squared(v));
@@ -250,20 +244,17 @@ char *vec2str(Arena *arena, vec3 *vec) {
 }
 
 char *vec2str_noArena(vec3 vec) {
-    // char *result = pushArray(arena, 100*sizeof(char));
     char *result = malloc(100*sizeof(char));
     sprintf(result, "%lf %lf %lf", vec.e[0], vec.e[1], vec.e[2]);
 
     return result;
 }
 
-
 double dot(vec3 u, vec3 v) {
     return u.e[0] * v.e[0] 
             + u.e[1] * v.e[1]
             + u.e[2] * v.e[2];
 }
-
 
 double hit_sphere_alt(vec3 center, double radius, ray r, double ray_tmin, double ray_tmax, hit_record *rec) {
     double a = dot(r.direction, r.direction);
@@ -283,15 +274,9 @@ double hit_sphere_alt(vec3 center, double radius, ray r, double ray_tmin, double
     }
 
     rec->t = root;
-    vec3 atval = at(r, rec->t);
+    rec->p = at(r, rec->t);
 
-    rec->p.e[0] = atval.e[0];
-    rec->p.e[1] = atval.e[1];
-    rec->p.e[2] = atval.e[2];
-
-    vec3 minusval = minus(rec->p, center);
-    vec3 outward_normal = vec_div(minusval, radius);
-
+    vec3 outward_normal = vec_div(minus(rec->p, center), radius);
     vec3 normal;
     if (dot(r.direction, outward_normal) > 0.0) {
         rec->front_face = 1;
@@ -301,17 +286,9 @@ double hit_sphere_alt(vec3 center, double radius, ray r, double ray_tmin, double
         normal = outward_normal;
     }
 
-    rec->normal.e[0] = normal.e[0];
-    rec->normal.e[1] = normal.e[1];
-    rec->normal.e[2] = normal.e[2];
-
+    rec->normal = normal;
     return true;
 }
-
-#define MAX_DIFFUSE_DEPTH 50
-#define HITTABLES_LENGTH 4
-
-hittable hittables[HITTABLES_LENGTH];
 
 int worldHit(ray r, double ray_tmin, double ray_tmax, hit_record *rec) {
     hit_record temp_rec;
@@ -419,11 +396,8 @@ vec3 ray_color(ray r, int depth) {
             double direction_magnitude = sqrt(x(direction) * x(direction) + y(direction) * y(direction) + z(direction) * z(direction));
 
             ray ray_new = newRay(rec.p, direction);
-            vec3 result = vec_mul(rec.albedo, ray_color(ray_new, depth -1)); 
-
-            return result;
+            return vec_mul(rec.albedo, ray_color(ray_new, depth -1)); 
         } else if (rec.material == DIELECTRIC) {
-
             vec3 attenuation = newVec3(1.0, 1.0, 1.0);
             double ri = rec.front_face ?  rec.refraction_index : (1.0/rec.refraction_index);
 
@@ -481,38 +455,37 @@ int main() {
 
     int hittables_index = 1;
 
-    // for (int a = -11; a < 11; ++a) {
-    //     for (int b = -11; b < 11; ++b) {
-    //         double choose_mat = random_double();
+    for (int a = -11; a < 11; ++a) {
+        for (int b = -11; b < 11; ++b) {
+            double choose_mat = random_double();
 
-    //         vec3 center = newVec3(a + 0.9*random_double(), 0.2, b + 0.9*random_double());
+            vec3 center = newVec3(a + 0.9*random_double(), 0.2, b + 0.9*random_double());
 
-    //         if (length(minus(center, newVec3(4, 0.2, 0))) > 0.9) {
-    //             hittables[hittables_index].center = center;
-    //             hittables[hittables_index].radius = 0.2;
+            if (length(minus(center, newVec3(4, 0.2, 0))) > 0.9) {
+                hittables[hittables_index].center = center;
+                hittables[hittables_index].radius = 0.2;
 
-    //             if (choose_mat < 0.8) {
-    //                 vec3 albedo = vec_mul(random_vec3(), random_vec3());
+                if (choose_mat < 0.8) {
+                    vec3 albedo = vec_mul(random_vec3(), random_vec3());
 
-    //                 hittables[hittables_index].material = LAMBERTIAN;
-    //                 hittables[hittables_index].albedo = albedo;
-    //             } else if (choose_mat < 0.95) {
-    //                 vec3 albedo = random_range_vec3(0.5, 1);
+                    hittables[hittables_index].material = LAMBERTIAN;
+                    hittables[hittables_index].albedo = albedo;
+                } else if (choose_mat < 0.95) {
+                    vec3 albedo = random_range_vec3(0.5, 1);
                     
-    //                 hittables[hittables_index].material = METAL;
-    //                 hittables[hittables_index].albedo = albedo;
-    //             } else {
+                    hittables[hittables_index].material = METAL;
+                    hittables[hittables_index].albedo = albedo;
+                } else {
 
-    //                 hittables[hittables_index].refraction_index = 1.5;
-    //                 hittables[hittables_index].material = DIELECTRIC;
-    //                 hittables[hittables_index].albedo = newVec3(0.7, 0.6, 0.5);
-    //             }
+                    hittables[hittables_index].refraction_index = 1.5;
+                    hittables[hittables_index].material = DIELECTRIC;
+                    hittables[hittables_index].albedo = newVec3(0.7, 0.6, 0.5);
+                }
 
-    //             hittables_index++;
-    //         }
-    //     }
-    // }
-
+                hittables_index++;
+            }
+        }
+    }
 
     hittables[hittables_index].center = newVec3(0, 1, 0);
     hittables[hittables_index].radius = 1;
@@ -535,8 +508,7 @@ int main() {
     hittables[hittables_index].albedo = newVec3(0.7, 0.6, 0.5);
     
     double aspect_ratio = 16.0/9.0; 
-    int image_width = 400;
-
+    int image_width = 1200;
     int image_height = (int)(image_width / aspect_ratio); 
 
     vec3 lookfrom = newVec3(13,2,3);
@@ -570,7 +542,7 @@ int main() {
 
     printf("P3\n%d %d\n255\n", image_width, image_height);
 
-    int samples_per_pixel = 10;
+    int samples_per_pixel = 500;
     double scale = 1.0/samples_per_pixel;
 
     for (int j = 0; j < image_height; j++) {
@@ -578,9 +550,7 @@ int main() {
             vec3 pixel_color = newVec3(0, 0, 0);
 
             int arg_count = 3;
-            vec3 arg2 = mul(i, pixel_delta_u); 
-            vec3 arg3 = mul(j, pixel_delta_v);
-            vec3 pixel_center = plus_vararg(arg_count, pixel00_loc, arg2, arg3);
+            vec3 pixel_center = plus_vararg(arg_count, pixel00_loc, mul(i, pixel_delta_u), mul(j, pixel_delta_v));
 
             for (int sample = 0; sample < samples_per_pixel; sample++) {
                 vec3 ray_direction = minus(pixel_center, camera_center);
