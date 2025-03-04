@@ -14,3 +14,8 @@ Second version:
 Final scene from Ray Tracing in One Weekend:
 
 ![imagepic3](https://github.com/o-oconnell/RayTracer/blob/main/finalscene.png)
+
+
+More samples:
+
+![imagepic4](https://github.com/o-oconnell/RayTracer/blob/main/finalscene_detailed.png)

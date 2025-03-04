@@ -508,9 +508,8 @@ double hit_sphere_alt(vec3 center, double radius, ray r, double ray_tmin, double
     return true;
 }
 
-#define MAX_DIFFUSE_DEPTH 10
+#define MAX_DIFFUSE_DEPTH 50
 #define HITTABLES_LENGTH 500
-#define SAMPLES_PER_PIXEL 10
 
 hittable hittables[HITTABLES_LENGTH];
 
@@ -884,7 +883,7 @@ int main() {
     fprintf(stderr, "Pixel 0,0 location is %s\n", vec2str(arena, &pixel00_loc));
     printf("P3\n%d %d\n255\n", image_width, image_height);
 
-    int samples_per_pixel = 10;
+    int samples_per_pixel = 500;
     double scale = 1.0/samples_per_pixel;
 
     for (int j = 0; j < image_height; j++) {
