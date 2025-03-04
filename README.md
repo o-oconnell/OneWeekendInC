@@ -19,3 +19,7 @@ Final scene from Ray Tracing in One Weekend:
 More samples:
 
 ![imagepic4](https://github.com/o-oconnell/RayTracer/blob/main/finalscene_detailed.png)
+
+With dielectrics:
+
+![imagepic5](https://github.com/o-oconnell/RayTracer/blob/main/finalscene_dielectric.png)

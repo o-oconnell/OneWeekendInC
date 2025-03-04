@@ -31,7 +31,8 @@ struct ray {
 
 enum hittable_material {
     METAL, 
-    LAMBERTIAN
+    LAMBERTIAN,
+    DIELECTRIC
 };
 
 typedef struct hit_record hit_record;
@@ -40,6 +41,7 @@ struct hit_record {
     vec3 normal;
     vec3 albedo;
     double t;
+    double refraction_index;
 
     int front_face;
     enum hittable_material material;
@@ -55,6 +57,7 @@ struct hittable {
     vec3 center;
     double radius;
     vec3 albedo;
+    double refraction_index;
 
     enum hittable_type type;
     enum hittable_material material;
@@ -496,15 +499,18 @@ double hit_sphere_alt(vec3 center, double radius, ray r, double ray_tmin, double
 
     vec3 normal;
     if (dot(r.direction, outward_normal) > 0.0) {
+        rec->front_face = 1;
         normal = mul_nopointer_noPointerArgs(-1.0, outward_normal);
     } else {
+        rec->front_face = 0;
         normal = outward_normal;
     }
 
     rec->normal.e[0] = normal.e[0];
     rec->normal.e[1] = normal.e[1];
     rec->normal.e[2] = normal.e[2];
-    
+
+
     return true;
 }
 
@@ -529,6 +535,7 @@ int worldHit(ray r, double ray_tmin, double ray_tmax, hit_record *rec) {
 
                 rec->material = object.material;
                 rec->albedo = object.albedo;
+                rec->refraction_index = object.refraction_index;
             }
         } else {
             fprintf(stderr, "UNRECOGNIZED OBJECT TYPE\n");
@@ -599,6 +606,22 @@ vec3 reflect_new(vec3 incoming, vec3 n) {
     return minus_nopointer_noPointerArgs(comp_a, L);
 }
 
+vec3 refract(vec3 uv, vec3 n, double etai_over_etat) {
+
+    double uvn = dot(mul_nopointer_noPointerArgs(-1.0, uv), n);
+    double cos_theta = uvn;
+    if (cos_theta > 1.0) {
+        cos_theta = 1.0;
+    }
+
+    vec3 r_out_perp = mul_nopointer_noPointerArgs(etai_over_etat, plus_nopointer_noPointerArgs(uv, mul_nopointer_noPointerArgs(cos_theta, n)));
+
+    double r_out_parallel_mul = -1.0 * sqrt(fabs(1.0 - length_squared_noPointer_noPointerArgs(r_out_perp)));
+    vec3 r_out_parallel = mul_nopointer_noPointerArgs(r_out_parallel_mul, n);
+
+    return plus_nopointer_noPointerArgs(r_out_perp, r_out_parallel);
+}
+
 vec3 vec_mul_noPointer(vec3 a, vec3 b) {
 
     return newVec3_noArena(a.e[0]*b.e[0], a.e[1]*b.e[1], a.e[2]*b.e[2]);
@@ -637,6 +660,26 @@ vec3 ray_color(ray r, int depth) {
             vec3 result = vec_mul_noPointer(rec.albedo, ray_color(ray_new, depth -1)); 
 
             return result;
+        } else if (rec.material == DIELECTRIC) {
+
+            vec3 attenuation = newVec3_noArena(1.0, 1.0, 1.0);
+            double ri = rec.front_face ?  rec.refraction_index : (1.0/rec.refraction_index);
+
+            vec3 unit_direction = unit_vector_noPointer(r.direction);
+            double cos_theta = dot(mul_nopointer_noPointerArgs(-1.0, unit_direction), rec.normal);
+            if (cos_theta > 1.0) cos_theta = 1.0;
+            double sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+
+            vec3 direction;
+            if (ri * sin_theta > 1.0) {
+                direction = reflect_new(unit_direction, rec.normal);
+            } else {
+                direction = refract(unit_direction, rec.normal, ri);
+            }
+
+            ray scattered = newRay_noArena(rec.p, direction);
+
+            return ray_color(scattered, depth - 1);
         } else {
             vec3 reflected = reflect_new(r.direction, rec.normal);
             ray scattered = newRay_noArena(rec.p, reflected);
@@ -707,11 +750,16 @@ int main() {
 
                     hittables[hittables_index].material = LAMBERTIAN;
                     hittables[hittables_index].albedo = albedo;
-                } else {
+                } else if (choose_mat < 0.95) {
                     vec3 albedo = random_range_vec3_noPointer(0.5, 1);
                     
                     hittables[hittables_index].material = METAL;
                     hittables[hittables_index].albedo = albedo;
+                } else {
+
+                    hittables[hittables_index].refraction_index = 1.5;
+                    hittables[hittables_index].material = DIELECTRIC;
+                    hittables[hittables_index].albedo = newVec3_noArena(0.7, 0.6, 0.5);
                 }
 
                 hittables_index++;
@@ -722,7 +770,8 @@ int main() {
 
     hittables[hittables_index].center = newVec3_noArena(0, 1, 0);
     hittables[hittables_index].radius = 1;
-    hittables[hittables_index].material = METAL;
+    hittables[hittables_index].material = DIELECTRIC;
+    hittables[hittables_index].refraction_index = 1.5;
     hittables[hittables_index].albedo = newVec3_noArena(0.7, 0.6, 0.5);
 
     hittables_index++;
@@ -883,7 +932,7 @@ int main() {
     fprintf(stderr, "Pixel 0,0 location is %s\n", vec2str(arena, &pixel00_loc));
     printf("P3\n%d %d\n255\n", image_width, image_height);
 
-    int samples_per_pixel = 500;
+    int samples_per_pixel = 10;
     double scale = 1.0/samples_per_pixel;
 
     for (int j = 0; j < image_height; j++) {
