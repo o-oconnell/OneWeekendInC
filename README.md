@@ -23,3 +23,7 @@ More samples:
 With dielectrics:
 
 ![imagepic5](https://github.com/o-oconnell/RayTracer/blob/main/finalscene_dielectric.png)
+
+Dielectrics with more samples:
+
+![imagepic6](https://github.com/o-oconnell/RayTracer/blob/main/finalscene_dielectrics_detailed.png)
